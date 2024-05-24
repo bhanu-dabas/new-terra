@@ -31,6 +31,21 @@ resource "aws_subnet" "private" {
   }
 }
 
+# Create an Internet Gateway
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+}
+
+# Create a NAT Gateway
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public.id
+
+  tags = {
+    Name = "NAT Gateway"
+  }
+}
+
 # Create a security group for the public subnet
 resource "aws_security_group" "public_sg" {
   name        = "public-sg"
@@ -73,6 +88,17 @@ resource "aws_security_group" "private_sg" {
   }
 }
 
+# Create an Elastic IP for the NAT Gateway
+resource "aws_eip" "nat" {
+  vpc      = true
+}
+
+# Associate the Elastic IP with the NAT Gateway
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public.id
+}
+
 # Create an EC2 instance in the public subnet
 resource "aws_instance" "public_instance" {
   ami           = "ami-05e00961530ae1b55"
@@ -80,6 +106,7 @@ resource "aws_instance" "public_instance" {
   vpc_security_group_ids = [aws_security_group.public_sg.id]
   subnet_id = aws_subnet.public.id
   key_name               = "mykey"
+  associate_public_ip_address = true  # Assigns a public IP address to this instance
 }
 
 # Create an EC2 instance in the private subnet
