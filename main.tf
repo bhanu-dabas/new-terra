@@ -1,63 +1,45 @@
-# Configure AWS provider
+# Configure the AWS provider
 provider "aws" {
-  region = "ap-south-1"  # Change to your desired region
+  region = "ap-south-1"
 }
 
-# Create VPC
-resource "aws_vpc" "my_vpc" {
-  cidr_block = "10.0.0.0/16"  # Change to your desired CIDR block
-
+# Create a VPC
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
   tags = {
-    Name = "my_vpc"
+    Name = "main"
   }
 }
 
-# Create internet gateway
-resource "aws_internet_gateway" "my_igw" {
-  vpc_id = aws_vpc.my_vpc.id
-
+# Create a public subnet
+resource "aws_subnet" "public" {
+  cidr_block = "10.0.1.0/24"
+  vpc_id     = aws_vpc.main.id
+  availability_zone = "ap-south-1"
   tags = {
-    Name = "my_igw"
+    Name = "public"
   }
 }
 
-# Attach internet gateway to VPC
-resource "aws_vpc_attachment" "my_vpc_attachment" {
-  vpc_id       = aws_vpc.my_vpc.id
-  internet_gateway_id = aws_internet_gateway.my_igw.id
-}
-
-# Create public subnet
-resource "aws_subnet" "public_subnet" {
-  vpc_id            = aws_vpc.my_vpc.id
-  cidr_block        = "10.0.1.0/24"  # Change to your desired public subnet CIDR block
-  availability_zone = "ap-south-1"   # Change to your desired availability zone
-
+# Create a private subnet
+resource "aws_subnet" "private" {
+  cidr_block = "10.0.2.0/24"
+  vpc_id     = aws_vpc.main.id
+  availability_zone = "ap-south-1"
   tags = {
-    Name = "public_subnet"
+    Name = "private"
   }
 }
 
-# Create private subnet
-resource "aws_subnet" "private_subnet" {
-  vpc_id            = aws_vpc.my_vpc.id
-  cidr_block        = "10.0.2.0/24"  # Change to your desired private subnet CIDR block
-  availability_zone = "ap-south-1"   # Change to your desired availability zone
-
-  tags = {
-    Name = "private_subnet"
-  }
-}
-
-# Create security group for public instances
+# Create a security group for the public subnet
 resource "aws_security_group" "public_sg" {
-  name        = "public_sg"
-  description = "Security group for public instances"
-  vpc_id      = aws_vpc.my_vpc.id
+  name        = "public-sg"
+  description = "Security group for public subnet"
+  vpc_id      = aws_vpc.main.id
 
   ingress {
-    from_port   = 0
-    to_port     = 65535
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -70,36 +52,41 @@ resource "aws_security_group" "public_sg" {
   }
 }
 
-# Create security group for private instances
+# Create a security group for the private subnet
 resource "aws_security_group" "private_sg" {
-  name        = "private_sg"
-  description = "Security group for private instances"
-  vpc_id      = aws_vpc.my_vpc.id
+  name        = "private-sg"
+  description = "Security group for private subnet"
+  vpc_id      = aws_vpc.main.id
 
-  # Add rules as needed for your application requirements
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
-# Create public EC2 instance
+# Create an EC2 instance in the public subnet
 resource "aws_instance" "public_instance" {
-  ami                    = "ami-05e00961530ae1b55"  # Change to your desired AMI ID
-  instance_type          = "t2.micro"      # Change to your desired instance type
-  subnet_id              = aws_subnet.public_subnet.id
-  security_groups        = [aws_security_group.public_sg.name]
-  associate_public_ip_address = true
-
-  tags = {
-    Name = "mongo1"
-  }
+  ami           = "ami-05e00961530ae1b55"
+  instance_type = "t2.micro"
+  vpc_security_group_ids = [aws_security_group.public_sg.id]
+  subnet_id = aws_subnet.public.id
+  key_name               = "mykey"
 }
 
-# Create private EC2 instance
+# Create an EC2 instance in the private subnet
 resource "aws_instance" "private_instance" {
-  ami                    = "ami-05e00961530ae1b55"  # Change to your desired AMI ID
-  instance_type          = "t2.micro"      # Change to your desired instance type
-  subnet_id              = aws_subnet.private_subnet.id
-  security_groups        = [aws_security_group.private_sg.name]
-
-  tags = {
-    Name = "mongo2"
-  }
+  ami           = "ami-05e00961530ae1b55"
+  instance_type = "t2.micro"
+  vpc_security_group_ids = [aws_security_group.private_sg.id]
+  subnet_id = aws_subnet.private.id
+  key_name               = "mykey"
 }
